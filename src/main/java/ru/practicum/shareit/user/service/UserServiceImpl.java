@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import ru.practicum.shareit.exceptions.DuplicatedEmailException;
 import ru.practicum.shareit.exceptions.NotFoundException;
-import ru.practicum.shareit.user.dao.UserRepositoryImpl;
+import ru.practicum.shareit.user.dao.UserRepository;
 import ru.practicum.shareit.user.dto.UpdateUserDto;
 import ru.practicum.shareit.user.dto.UserDto;
 import ru.practicum.shareit.user.dto.UserMapper;
@@ -16,7 +16,7 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
-    private final UserRepositoryImpl userRepositoryImpl;
+    private final UserRepository userRepositoryImpl;
 
     @Override
     public List<UserDto> getAllUsers() {
@@ -30,8 +30,7 @@ public class UserServiceImpl implements UserService {
     @Override
     public UserDto getUser(Long userId) {
         if (userId != null) {
-            User user = userRepositoryImpl.findById(userId)
-                    .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
+            User user = findUserById(userId);
             return UserMapper.toUserDto(user);
         } else {
             return null;
@@ -45,7 +44,6 @@ public class UserServiceImpl implements UserService {
         }
         User createdUser = userRepositoryImpl.create(user);
         return UserMapper.toUserDto(createdUser);
-
     }
 
     @Override
@@ -57,13 +55,17 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserDto updateUser(Long userId, UpdateUserDto requestUser) {
-        User user = userRepositoryImpl.findById(userId)
-                .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
+        User user = findUserById(userId);
         if (userRepositoryImpl.findByEmail(requestUser.getEmail())) {
             throw new DuplicatedEmailException("Пользователь с таким email уже существует");
         }
         User updated = UserMapper.updateUser(user, requestUser);
         userRepositoryImpl.update(user);
         return UserMapper.toUserDto(updated);
+    }
+
+    private User findUserById(Long userId) {
+        return userRepositoryImpl.findById(userId)
+                .orElseThrow(() -> new NotFoundException("Пользователь с id: " + userId + " не найден"));
     }
 }

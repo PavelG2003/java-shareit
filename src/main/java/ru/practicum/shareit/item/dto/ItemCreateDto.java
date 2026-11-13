@@ -12,8 +12,8 @@ public class ItemCreateDto {
     @NotBlank
     @Size(max = 50)
     String name;
+    @NotBlank
     @Size(max = 200)
-    @NotNull
     String description;
     @NotNull
     Boolean available;

@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import ru.practicum.shareit.exceptions.ForbiddenException;
 import ru.practicum.shareit.exceptions.NotFoundException;
-import ru.practicum.shareit.item.dao.ItemRepositoryImpl;
+import ru.practicum.shareit.item.dao.ItemRepository;
 import ru.practicum.shareit.item.dto.*;
 import ru.practicum.shareit.item.model.Item;
 import ru.practicum.shareit.request.ItemRequestRepository;
@@ -16,22 +16,19 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class ItemServiceImpl implements ItemService {
-    private final ItemRepositoryImpl itemRepository;
+    private final ItemRepository itemRepository;
     private final UserRepository userRepository;
     private final ItemRequestRepository itemRequestRepository;
 
     @Override
     public ItemDto createItem(ItemCreateDto requestItem, Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
-        Item item = new Item();
-        item.setOwner(user);
-        item.setName(requestItem.getName());
-        item.setDescription(requestItem.getDescription());
-        item.setAvailable(requestItem.getAvailable());
+        User user = findUserById(userId);
+        Item item = ItemMapper.toItemFromCreateDto(requestItem, user);
         if (requestItem.getRequestId() != null) {
             item.setRequest(itemRequestRepository.findById(requestItem.getRequestId())
-                    .orElseThrow(() -> new NotFoundException("Запрос не найден")));
+                    .orElseThrow(() -> new NotFoundException(
+                            "Запрос с id: " + requestItem.getRequestId() + " не найден"
+                    )));
         }
         Item created = itemRepository.create(item);
         return ItemMapper.toItemDto(created);
@@ -39,10 +36,8 @@ public class ItemServiceImpl implements ItemService {
 
     @Override
     public ItemDto updateItem(Long userId, Long itemId, ItemUpdateDto requestItem) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
-        Item item = itemRepository.findById(itemId)
-                .orElseThrow(() -> new NotFoundException("Item не найден"));
+        User user = findUserById(userId);
+        Item item = findItemById(itemId);
         if (item.getOwner() != user) {
             throw new ForbiddenException("Доступ на редактирование вещи запрещён");
         }
@@ -53,15 +48,12 @@ public class ItemServiceImpl implements ItemService {
 
     @Override
     public ItemDto getItem(Long userId, Long itemId) {
-        Item item = itemRepository.findById(itemId)
-                .orElseThrow(() -> new NotFoundException("Item не найден"));
+        Item item = findItemById(itemId);
         return ItemMapper.toItemDto(item);
     }
 
     @Override
     public List<ItemShortDto> getAllUserItems(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
         List<Item> userItems = itemRepository.findAllByUserId(userId);
         return userItems.stream()
                 .map(ItemMapper::toItemShortDto)
@@ -70,11 +62,21 @@ public class ItemServiceImpl implements ItemService {
 
     @Override
     public List<ItemDto> searchItems(long userId, String text) {
-        if (text.isBlank()) {
+        if (text == null || text.isBlank()) {
             return List.of();
         }
         return itemRepository.searchAvailable(text).stream()
                 .map(ItemMapper::toItemDto)
                 .toList();
+    }
+
+    private User findUserById(Long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("Пользователь с id: " + userId + " не найден"));
+    }
+
+    private Item findItemById(Long itemId) {
+        return itemRepository.findById(itemId)
+                .orElseThrow(() -> new NotFoundException("Item с id: " + itemId + " не найден"));
     }
 }
